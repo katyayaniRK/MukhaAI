@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Missing Person Search</title>
+<style>
+:root {
+  --bg:#eef1f3; --panel:#ffffff; --side:#e3e8ec; --ink:#16212b; --muted:#5d6b78; --line:#cdd5dc;
+  --field:#ffffff; --accent:#0d6f7a; --accent-h:#0a5a63; --accent-ink:#ffffff;
+  --ok:#1c7f48; --warn:#a96a0b; --bad:#b83a35; --btn:#dde3e8; --btn-h:#cfd7de; --pill-ink:#ffffff;
+  --shadow:0 1px 2px rgba(22,33,43,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#11181e; --panel:#1a232b; --side:#151d24; --ink:#e7edf1; --muted:#93a1ad; --line:#2d3944;
+    --field:#0f161b; --accent:#3bb0bd; --accent-h:#58c3cf; --accent-ink:#06242a;
+    --ok:#3fbf7a; --warn:#e0a03a; --bad:#ee6a64; --btn:#26323c; --btn-h:#303e4a; --pill-ink:#0b1216;
+    --shadow:none;
+  }
+}
+* { box-sizing:border-box; }
+html, body { height:100%; }
+body {
+  margin:0; background:var(--bg); color:var(--ink); display:flex; flex-direction:column;
+  font:14px/1.45 system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+h1, h2, h3, p { margin:0; }
+button, input, select { font:inherit; color:inherit; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+[hidden] { display:none !important; }
+.muted { color:var(--muted); }
+.num { font-variant-numeric:tabular-nums; }
+
+/* header */
+.top { background:var(--side); border-bottom:1px solid var(--line); padding:12px 22px;
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+.top h1 { font-size:18px; font-weight:700; letter-spacing:-.01em; }
+.top p { font-size:13px; color:var(--muted); }
+
+.layout { flex:1; min-height:0; display:grid; grid-template-columns:352px 1fr; }
+aside { background:var(--side); border-right:1px solid var(--line); overflow-y:auto; padding:14px; }
+main { min-width:0; display:flex; flex-direction:column; min-height:0; }
+
+/* buttons */
+.btn { background:var(--btn); border:1px solid transparent; border-radius:6px; padding:7px 14px;
+  cursor:pointer; line-height:1.2; }
+.btn:hover:not(:disabled) { background:var(--btn-h); }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.btn.primary { background:var(--accent); color:var(--accent-ink); font-weight:650; padding:9px 16px; }
+.btn.primary:hover:not(:disabled) { background:var(--accent-h); }
+.btn.small { padding:4px 10px; font-size:13px; }
+.btn.ghost { background:transparent; border-color:var(--line); }
+.btn.ghost:hover:not(:disabled) { background:var(--btn); }
+.row { display:flex; gap:8px; }
+.row > .grow { flex:1; }
+
+/* sidebar panels */
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+  margin-bottom:12px; box-shadow:var(--shadow); }
+.panel:last-child { margin-bottom:0; }
+.panel h2 { font-size:15px; font-weight:700; display:flex; align-items:center; gap:10px; }
+.panel h2 .n { width:22px; height:22px; border-radius:50%; background:var(--accent); color:var(--accent-ink);
+  display:inline-grid; place-items:center; font-size:12px; font-weight:700; flex:none; }
+.panel .hint { font-size:12px; color:var(--muted); margin:2px 0 10px 32px; }
+
+.people { list-style:none; margin:10px 0 0; padding:0; max-height:210px; overflow-y:auto;
+  background:var(--field); border:1px solid var(--line); border-radius:6px; }
+.people li { display:flex; align-items:center; border-bottom:1px solid var(--line); }
+.people li:last-child { border-bottom:0; }
+.people .who { flex:1; min-width:0; text-align:left; background:none; border:0; padding:7px 10px; cursor:pointer;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.people .who:hover { background:var(--btn); }
+.people .cnt { color:var(--muted); font-size:12px; white-space:nowrap; padding-right:4px; }
+.people .x { background:none; border:0; cursor:pointer; color:var(--muted); font-size:17px; padding:4px 10px; line-height:1; }
+.people .x:hover { color:var(--bad); }
+.empty-note { color:var(--muted); font-size:13px; padding:16px 10px; text-align:center; background:var(--field);
+  border:1px dashed var(--line); border-radius:6px; margin-top:10px; }
+.dbfoot { display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
+.dbfoot span { font-size:12px; color:var(--muted); }
+
+.field { display:grid; grid-template-columns:auto 1fr; gap:8px 12px; align-items:center; margin:8px 0; }
+.field label { font-size:13px; color:var(--muted); }
+select, input[type=number], input[type=text] { background:var(--field); border:1px solid var(--line); border-radius:6px;
+  padding:6px 8px; width:100%; }
+input[type=number] { width:76px; }
+.bar { height:8px; background:var(--field); border-radius:4px; overflow:hidden; margin-top:10px; border:1px solid var(--line); }
+.bar > i { display:block; height:100%; width:0; background:var(--accent); transition:width .25s; }
+.bar.indet > i { width:36%; animation:slide 1.2s ease-in-out infinite; }
+@keyframes slide { 0% { margin-left:-36%; } 100% { margin-left:100%; } }
+.status { font-size:13px; color:var(--muted); margin-top:8px; overflow-wrap:anywhere; }
+.status.fail { color:var(--bad); }
+
+/* main area */
+.results-head { padding:18px 22px 0; }
+.results-head .t { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.results-head h2 { font-size:18px; font-weight:700; }
+.check { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; }
+.check input { width:16px; height:16px; accent-color:var(--accent); }
+#info { margin:4px 0 10px; font-size:13px; color:var(--muted); }
+#info div + div { margin-top:2px; }
+.scroll { flex:1; min-height:0; overflow-y:auto; padding:0 22px 22px; }
+
+.center { text-align:center; padding:60px 10px; }
+.center h3 { font-size:20px; margin-bottom:12px; }
+.center ol { display:inline-block; text-align:left; margin:0; padding-left:20px; color:var(--muted); font-size:15px; line-height:1.9; }
+.center .tip { margin-top:20px; font-size:13px; color:var(--muted); }
+
+/* loading */
+.loading { max-width:480px; margin:40px auto 0; text-align:center; }
+.spin { width:60px; height:60px; border-radius:50%; border:5px solid var(--line); border-top-color:var(--accent);
+  margin:0 auto 12px; animation:rot .9s linear infinite; }
+@keyframes rot { to { transform:rotate(360deg); } }
+.loading h3 { font-size:19px; }
+.steps { list-style:none; margin:16px 0 0; padding:12px 16px; background:var(--panel); border:1px solid var(--line);
+  border-radius:8px; text-align:left; }
+.steps li { display:flex; gap:10px; padding:4px 0; color:var(--muted); }
+.steps li .m { width:18px; text-align:center; }
+.steps li.done { color:var(--ink); } .steps li.done .m { color:var(--ok); }
+.steps li.now { color:var(--ink); font-weight:650; } .steps li.now .m { color:var(--accent); }
+.loading .desc { margin-top:14px; font-size:13px; color:var(--muted); }
+.loading .detail { margin-top:6px; overflow-wrap:anywhere; }
+
+/* people + candidates */
+.person { display:flex; align-items:center; gap:14px; margin:22px 0 6px; }
+.person img { height:60px; border-radius:4px; border:1px solid var(--line); cursor:pointer; display:block; }
+.person h3 { font-size:16px; }
+.person .sub { font-size:13px; color:var(--muted); }
+.person .sub.ok { color:var(--ok); }
+
+.cand { display:flex; background:var(--panel); border:1px solid var(--line); border-radius:8px; margin:8px 0;
+  overflow:hidden; box-shadow:var(--shadow); }
+.cand > .edge { width:6px; flex:none; background:var(--warn); }
+.cand.strong > .edge { background:var(--ok); }
+.cand .body { flex:1; min-width:0; padding:12px 16px; }
+.cand .hd { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cand .hd b { font-size:15px; }
+.pill { background:var(--warn); color:var(--pill-ink); border-radius:999px; padding:2px 10px; font-size:12px; font-weight:700; }
+.cand.strong .pill { background:var(--ok); }
+.cand .mid { display:flex; gap:18px; margin-top:10px; flex-wrap:wrap; }
+.crops { display:flex; gap:6px; align-items:flex-start; }
+.crops img { height:96px; border:1px solid var(--line); border-radius:4px; cursor:pointer; display:block; }
+.facts { display:grid; grid-template-columns:auto 1fr; gap:2px 14px; font-size:13px; align-content:start; }
+.facts dt { color:var(--muted); } .facts dd { margin:0; }
+.ok-t { color:var(--ok); } .warn-t { color:var(--warn); } .bad-t { color:var(--bad); }
+.meter { display:inline-block; width:90px; height:6px; border-radius:3px; background:var(--line); vertical-align:middle;
+  margin-left:8px; overflow:hidden; }
+.meter > i { display:block; height:100%; }
+.meter.ok > i { background:var(--ok); } .meter.warn > i { background:var(--warn); } .meter.bad > i { background:var(--bad); }
+.note { color:var(--warn); font-size:12px; margin-top:6px; }
+.cand .acts { display:flex; gap:6px; margin-top:8px; }
+.decide { display:flex; align-items:center; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); flex-wrap:wrap; }
+.decide span { color:var(--muted); font-size:13px; margin-right:6px; }
+.dbtn { border:1px solid var(--line); background:var(--btn); border-radius:6px; padding:7px 14px; cursor:pointer; }
+.dbtn:hover { background:var(--btn-h); }
+.dbtn.on.same { background:var(--ok); border-color:var(--ok); color:var(--pill-ink); font-weight:650; }
+.dbtn.on.not { background:var(--bad); border-color:var(--bad); color:var(--pill-ink); font-weight:650; }
+
+/* bottom bar */
+.foot { border-top:1px solid var(--line); background:var(--panel); padding:12px 22px; display:flex; gap:16px;
+  align-items:center; justify-content:space-between; flex-wrap:wrap; }
+#summary { font-size:14px; } #summary.ok { color:var(--ok); }
+.saved { display:flex; gap:8px; align-items:center; font-size:13px; }
+.saved a { color:var(--accent); }
+
+/* dialogs */
+dialog { border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); padding:0;
+  max-width:min(96vw, 1000px); max-height:94vh; }
+dialog::backdrop { background:rgba(8,12,16,.6); }
+.dlg { padding:18px 20px; overflow:auto; max-height:94vh; }
+.dlg h3 { font-size:16px; margin-bottom:4px; }
+.dlg .big { display:block; max-width:100%; max-height:70vh; margin:12px auto 8px; border:1px solid var(--line); }
+.dlg .cap { text-align:center; color:var(--muted); font-size:13px; }
+.dlg .nav { display:flex; gap:8px; justify-content:center; margin-top:12px; }
+.dlg .strip { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.dlg .strip img { height:200px; max-width:100%; border:1px solid var(--line); border-radius:4px; }
+.dlg .box { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-top:12px; }
+.dlg .radio { display:flex; gap:10px; align-items:flex-start; margin:10px 0; cursor:pointer; }
+.dlg .radio input { margin-top:3px; accent-color:var(--accent); }
+.dlg .radio small { display:block; color:var(--muted); }
+
+.toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); max-width:min(90vw, 560px); background:var(--ink);
+  color:var(--bg); padding:10px 16px; border-radius:8px; white-space:pre-line; z-index:50; box-shadow:0 6px 20px rgba(0,0,0,.3); }
+
+@media (max-width: 860px) {
+  body { height:auto; } html, body { height:auto; }
+  .layout { grid-template-columns:1fr; }
+  aside { border-right:0; border-bottom:1px solid var(--line); }
+  .scroll { overflow:visible; }
+  .cand .mid { flex-direction:column; }
+}
+@media (prefers-reduced-motion: reduce) { .spin, .bar.indet > i { animation:none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Missing Person Search</h1>
+  <p>Find people from your image database in CCTV footage</p>
+</header>
+
+<div class="layout">
+<aside>
+  <section class="panel">
+    <h2><span class="n">1</span>Image database</h2>
+    <p class="hint">The people you want to find</p>
+    <div class="row">
+      <button class="btn grow" id="add-photos">Add photo(s)...</button>
+      <button class="btn grow" id="add-folder">Add folder...</button>
+    </div>
+    <input type="file" id="photo-input" accept=".jpg,.jpeg,.png" multiple hidden>
+    <input type="file" id="folder-input" webkitdirectory multiple hidden>
+    <ul class="people" id="people" hidden></ul>
+    <div class="empty-note" id="people-empty">No people added yet.<br>Use the buttons above.</div>
+    <div class="dbfoot">
+      <button class="btn small" id="clear-db">Clear all</button>
+      <span id="db-count">No people yet</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2><span class="n">2</span>Video</h2>
+    <p class="hint">The CCTV footage to scan</p>
+    <button class="btn" id="choose-video" style="width:100%">Choose video...</button>
+    <input type="file" id="video-input" accept=".mp4,.avi,.mov,.mkv,video/*" hidden>
+    <div class="bar" id="upload-bar" hidden><i></i></div>
+    <p class="status" id="video-label">No video chosen</p>
+  </section>
+
+  <section class="panel">
+    <h2><span class="n">3</span>Search</h2>
+    <p class="hint">Run it, then review the results</p>
+    <div class="field">
+      <label for="speed">Speed</label>
+      <select id="speed">
+        <option value="fast">Fast (every 8th frame)</option>
+        <option value="balanced" selected>Balanced (every 5th frame)</option>
+        <option value="thorough">Thorough (every 2nd frame)</option>
+      </select>
+      <label for="topk">Matches per person</label>
+      <input type="number" id="topk" min="1" max="10" value="3">
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary grow" id="start" disabled>Start search</button>
+      <button class="btn" id="cancel" disabled>Cancel</button>
+    </div>
+    <div class="bar" id="bar"><i></i></div>
+    <p class="status" id="status" aria-live="polite">Add photos and choose a video to begin.</p>
+  </section>
+</aside>
+
+<main>
+  <div class="results-head">
+    <div class="t">
+      <h2>Results</h2>
+      <label class="check"><input type="checkbox" id="only-strong"> Only strong matches</label>
+    </div>
+    <div id="info"></div>
+  </div>
+  <div class="scroll" id="body"></div>
+  <div class="foot">
+    <div id="summary"></div>
+    <div class="saved" id="saved"></div>
+    <button class="btn primary" id="save" disabled>Save report</button>
+  </div>
+</main>
+</div>
+
+<dialog id="dlg"><div class="dlg" id="dlg-body"></div></dialog>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const q = encodeURIComponent;
+
+let state = { people: [], video: null, job: { state: "idle" }, search_id: 0 };
+let results = null;
+let timer = null;
+let lastJob = "idle";
+let toastTimer = null;
+let latestReport = null;
+
+/* ------------------------------------------------------------ helpers */
+async function api(url, opts) {
+  const r = await fetch(url, opts);
+  let d = null;
+  try { d = await r.json(); } catch (e) { /* not json */ }
+  if (!r.ok) throw new Error((d && d.error) || r.statusText);
+  return d;
+}
+const post = (url, body) => api(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+
+function toast(msg, ms = 4500) {
+  const t = $("#toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+}
+
+function upload(url, form, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", url);
+    x.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+    x.onload = () => {
+      let d = null;
+      try { d = JSON.parse(x.responseText); } catch (e) { /* ignore */ }
+      if (x.status >= 200 && x.status < 300) resolve(d);
+      else reject(new Error((d && d.error) || "Upload failed (" + x.status + ")"));
+    };
+    x.onerror = () => reject(new Error("Upload failed. Check that the server is still running."));
+    x.send(form);
+  });
+}
+
+function setBar(el, frac) {
+  el.classList.remove("indet");
+  el.firstElementChild.style.width = Math.round(frac * 100) + "%";
+}
+
+const busy = () => state.job.state === "running";
+
+/* ------------------------------------------------------------ database */
+function renderDb() {
+  const ul = $("#people");
+  ul.innerHTML = "";
+  state.people.forEach(p => {
+    const li = document.createElement("li");
+    li.innerHTML = `<button class="who" title="View photos">${esc(p.name)}</button>
+      <span class="cnt">${p.n} photo${p.n === 1 ? "" : "s"}</span>
+      <button class="x" title="Remove ${esc(p.name)}" aria-label="Remove ${esc(p.name)}">×</button>`;
+    li.querySelector(".who").onclick = () => openViewer(p.name, p.n, i => `/api/db/photo?name=${q(p.name)}&i=${i}`);
+    li.querySelector(".x").onclick = () => removePeople([p.name]);
+    ul.appendChild(li);
+  });
+  ul.hidden = !state.people.length;
+  $("#people-empty").hidden = !!state.people.length;
+  const n = state.people.length;
+  $("#db-count").textContent = n ? `${n} ${n === 1 ? "person" : "people"}` : "No people yet";
+  updateControls();
+}
+
+async function removePeople(names) {
+  try { state.people = (await post("/api/people/remove", { names })).people; renderDb(); }
+  catch (e) { toast(e.message); }
+}
+
+$("#clear-db").onclick = async () => {
+  if (!state.people.length || !confirm("Remove all people from the database?")) return;
+  try { state.people = (await post("/api/people/clear")).people; renderDb(); }
+  catch (e) { toast(e.message); }
+};
+
+async function sendPeople(form) {
+  setStatus("Uploading photos...");
+  try {
+    const d = await upload("/api/people", form, f => setStatus(`Uploading photos... ${Math.round(f * 100)}%`));
+    state.people = d.people;
+    renderDb();
+    resetIdleStatus();
+  } catch (e) { toast(e.message); resetIdleStatus(); }
+}
+
+const isImg = f => /\.(jpe?g|png)$/i.test(f.name);
+
+$("#add-photos").onclick = () => $("#photo-input").click();
+$("#photo-input").onchange = e => {
+  const files = [...e.target.files].filter(isImg);
+  e.target.value = "";
+  if (!files.length) return;
+  const build = (mode, name) => {
+    const f = new FormData();
+    f.append("mode", mode);
+    if (name) f.append("name", name);
+    files.forEach(x => f.append("files", x, x.name));
+    sendPeople(f);
+  };
+  if (files.length === 1) return build("each");
+  const dlg = $("#dlg"), body = $("#dlg-body");
+  const guess = files[0].name.replace(/\.[^.]+$/, "");
+  body.innerHTML = `<h3>One person or several?</h3>
+    <p class="muted">You chose ${files.length} photos.</p>
+    <label class="radio"><input type="radio" name="m" value="one"><span>All of ONE person<small>Several photos of the same face</small></span></label>
+    <label class="radio"><input type="radio" name="m" value="each" checked><span>Each photo is a different person<small>Named after the file</small></span></label>
+    <div id="nm" hidden><label class="muted" for="nm-in">Name of this person</label>
+      <input type="text" id="nm-in" value="${esc(guess)}"></div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn ghost" id="d-cancel">Cancel</button><button class="btn primary" id="d-ok">Add</button></div>`;
+  const radios = body.querySelectorAll("input[name=m]");
+  const sync = () => { body.querySelector("#nm").hidden = body.querySelector("input[name=m]:checked").value !== "one"; };
+  radios.forEach(r => r.onchange = sync);
+  body.querySelector("#d-cancel").onclick = () => dlg.close();
+  body.querySelector("#d-ok").onclick = () => {
+    const mode = body.querySelector("input[name=m]:checked").value;
+    const name = body.querySelector("#nm-in").value.trim();
+    if (mode === "one" && !name) { body.querySelector("#nm-in").focus(); return; }
+    dlg.close();
+    build(mode, name);
+  };
+  dlg.showModal();
+};
+
+$("#add-folder").onclick = () => $("#folder-input").click();
+$("#folder-input").onchange = e => {
+  const files = [...e.target.files].filter(isImg);
+  e.target.value = "";
+  if (!files.length) {
+    return toast("No .jpg, .jpeg or .png photos were found.\n\nEach photo directly in the folder becomes one person.\nEach sub-folder becomes one person.", 8000);
+  }
+  const f = new FormData();
+  f.append("mode", "folder");
+  files.forEach(x => { f.append("files", x, x.name); f.append("paths", x.webkitRelativePath || x.name); });
+  sendPeople(f);
+};
+
+/* ------------------------------------------------------------ video */
+$("#choose-video").onclick = () => $("#video-input").click();
+$("#video-input").onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  const bar = $("#upload-bar");
+  bar.hidden = false; setBar(bar, 0);
+  $("#video-label").textContent = `Uploading ${file.name}...`;
+  const f = new FormData();
+  f.append("file", file, file.name);
+  try {
+    const d = await upload("/api/video", f, p => {
+      setBar(bar, p);
+      $("#video-label").textContent = `Uploading ${file.name}... ${Math.round(p * 100)}%`;
+    });
+    state.video = d.video;
+  } catch (err) { toast(err.message); }
+  bar.hidden = true;
+  renderVideo();
+};
+
+function renderVideo() {
+  const l = $("#video-label");
+  l.textContent = state.video || "No video chosen";
+  l.style.color = state.video ? "var(--ink)" : "";
+  updateControls();
+}
+
+/* ------------------------------------------------------------ status + controls */
+function setStatus(t, fail) {
+  const s = $("#status");
+  s.textContent = t; s.classList.toggle("fail", !!fail);
+}
+function resetIdleStatus() {
+  if (busy()) return;
+  if (state.job.state === "done") return setStatus("Done. Review the candidates.");
+  setStatus(state.people.length && state.video ? "Ready to search." : "Add photos and choose a video to begin.");
+}
+function updateControls() {
+  const ready = state.people.length && state.video;
+  $("#start").disabled = !(ready && !busy());
+  $("#cancel").disabled = !busy();
+  for (const id of ["#add-photos", "#add-folder", "#clear-db", "#choose-video"]) $(id).disabled = busy();
+  $("#save").disabled = !(results && results.has_matches) || busy();
+  if (!busy() && state.job.state !== "done") resetIdleStatus();
+}
+
+/* ------------------------------------------------------------ search + polling */
+$("#start").onclick = async () => {
+  try {
+    const d = await post("/api/search", { speed: $("#speed").value, top_k: parseInt($("#topk").value, 10) || 3 });
+    results = null; latestReport = null;
+    state.job = d.job; state.search_id = d.search_id; lastJob = "running";
+    $("#info").innerHTML = ""; $("#summary").textContent = ""; $("#saved").innerHTML = "";
+    $("#bar").classList.add("indet"); $("#bar").firstElementChild.style.width = "";
+    showLoading(d.job);
+    updateControls();
+    startPolling();
+  } catch (e) { toast(e.message); }
+};
+$("#cancel").onclick = async () => { await post("/api/cancel"); setStatus("Cancelling..."); };
+
+function startPolling() { stopPolling(); timer = setInterval(poll, 700); }
+function stopPolling() { if (timer) clearInterval(timer); timer = null; }
+
+async function poll() {
+  let j;
+  try { j = await api("/api/status"); } catch (e) { return; }
+  state.job = j; state.search_id = j.search_id;
+  if (j.state === "running") {
+    updateLoading(j);
+    if (j.fraction != null) setBar($("#bar"), j.fraction);
+    setStatus(j.status || "Working...");
+    return;
+  }
+  stopPolling();
+  await onJobEnded(j);
+}
+
+async function onJobEnded(j) {
+  lastJob = j.state;
+  if (j.state === "done") {
+    await loadResults(true);
+  } else if (j.state === "cancelled") {
+    setStatus("Search cancelled."); showPlaceholder();
+  } else if (j.state === "error") {
+    setStatus("Search failed.", true); showPlaceholder();
+    alert("Search failed\n\n" + j.error);
+  }
+  setBar($("#bar"), j.state === "done" ? 1 : 0);
+  updateControls();
+}
+
+/* ------------------------------------------------------------ main views */
+function showPlaceholder() {
+  $("#body").innerHTML = `<div class="center"><h3>Ready to search</h3>
+    <ol><li>Add photos of the people you want to find</li><li>Choose a CCTV video</li><li>Press Start search</li></ol>
+    <p class="tip">Tip: click a name in the database list to see its photos large.</p></div>`;
+  $("#info").innerHTML = "";
+}
+
+function showLoading(j) {
+  $("#body").innerHTML = `<div class="loading">
+    <div class="spin"></div><h3>Searching the video...</h3>
+    <p class="muted num" id="l-elapsed" style="margin:2px 0 12px">Elapsed 00:00</p>
+    <div class="bar indet" id="l-bar"><i></i></div>
+    <ul class="steps" id="l-steps"></ul>
+    <p class="desc" id="l-desc"></p><p class="detail" id="l-detail">Starting...</p>
+    <p class="muted" style="font-size:12px;margin-top:14px">You can cancel at any time from the left panel.</p></div>`;
+  $("#l-steps").innerHTML = j.steps.map(s => `<li><span class="m">○</span><span>${esc(s.title)}</span></li>`).join("");
+  updateLoading(j);
+}
+
+function updateLoading(j) {
+  const steps = $("#l-steps");
+  if (!steps) return showLoading(j);
+  [...steps.children].forEach((li, i) => {
+    li.className = i < j.step ? "done" : i === j.step ? "now" : "";
+    li.firstElementChild.textContent = i < j.step ? "✓" : i === j.step ? "●" : "○";
+  });
+  $("#l-desc").textContent = j.steps[j.step] ? j.steps[j.step].desc : "";
+  const pct = j.fraction != null ? `   (${Math.floor(j.fraction * 100)}%)` : "";
+  $("#l-detail").textContent = (j.status || "Starting...") + pct;
+  const m = Math.floor(j.elapsed / 60), s = j.elapsed % 60;
+  $("#l-elapsed").textContent = `Elapsed ${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  if (j.fraction != null) setBar($("#l-bar"), j.fraction);
+}
+
+/* ------------------------------------------------------------ results */
+async function loadResults(initial) {
+  try { results = await api("/api/results"); }
+  catch (e) { results = null; return showPlaceholder(); }
+  if (initial) $("#only-strong").checked = results.default_only_strong;
+  $("#info").innerHTML = results.head.map(l => `<div>${esc(l)}</div>`).join("");
+  setStatus("Done. Review the candidates.");
+  renderResults();
+  updateControls();
+}
+
+const visibleMatches = p => p.matches.filter(m => !$("#only-strong").checked || m.strong);
+$("#only-strong").onchange = () => renderResults();
+
+function renderResults() {
+  if (!results) return;
+  const body = $("#body");
+  body.innerHTML = "";
+  const v = results.search_id;
+  let shown = 0;
+  results.people.forEach(p => {
+    const ms = visibleMatches(p);
+    if (!ms.length) return;
+    shown++;
+    const nStrong = ms.filter(m => m.strong).length;
+    const head = document.createElement("div");
+    head.className = "person";
+    head.innerHTML = (p.has_thumb ? `<img src="/api/results/person/${p.idx}/thumb.jpg?v=${v}" alt="Photo of ${esc(p.name)}" title="View database photos">` : "") +
+      `<div><h3>${esc(p.name)}</h3><div class="sub ${nStrong ? "ok" : ""}">${nStrong ? nStrong + " strong match(es)" : "No strong match"}  ·  ${ms.length} candidate(s) shown</div></div>`;
+    const img = head.querySelector("img");
+    if (img) img.onclick = () => openViewer(p.name, p.n_photos, i => `/api/results/person/${p.idx}/photo?i=${i}&v=${v}`);
+    body.appendChild(head);
+    ms.forEach(m => body.appendChild(candidateCard(m, p, v)));
+  });
+  if (!shown) {
+    let msg;
+    if (results.n_tracks === 0) msg = "No face track was long enough to compare. Try another video.";
+    else if (!results.has_matches) msg = "No match found.\nFaces were detected, but none is similar enough to anyone in the database\n(they may also be too small or blurry).";
+    else msg = "No strong match for anyone in the database.\nUntick 'Only strong matches' to see the closest candidates.";
+    body.innerHTML = `<div class="center"><p class="muted" style="font-size:15px;white-space:pre-line">${esc(msg)}</p></div>`;
+  }
+  updateSummary();
+}
+
+function candidateCard(m, p, v) {
+  const el = document.createElement("article");
+  el.className = "cand" + (m.strong ? " strong" : "");
+  const confCls = { ok: "ok-t", warn: "warn-t", bad: "bad-t" }[m.level];
+  const crops = Array.from({ length: m.n_crops }, (_, i) =>
+    `<img src="/api/match/${q(m.uid)}/crop/${i}.jpg?v=${v}" alt="Face found in the video">`).join("");
+  el.innerHTML = `<div class="edge"></div><div class="body">
+    <div class="hd"><b>Candidate #${m.rank}</b><span class="pill">${esc(m.label)}</span></div>
+    <div class="mid"><div class="crops" title="Compare faces">${crops}</div>
+    <dl class="facts num">
+      <dt>Confidence</dt><dd class="${confCls}">${m.confidence}%<span class="meter ${m.level}"><i style="width:${m.confidence}%"></i></span></dd>
+      <dt>Time</dt><dd>${m.start} – ${m.end}  ·  ${m.n} detections</dd>
+      <dt>Frames</dt><dd>${m.first_frame} – ${m.last_frame}  ·  preview ${m.mid_frame}</dd>
+      <dt>ArcFace</dt><dd class="${m.arc_ok ? "ok-t" : ""}">${m.arc.toFixed(3)} distance</dd>
+      <dt>FaceNet</dt><dd class="${m.fn_ok ? "ok-t" : ""}">${m.fn === null ? "n/a" : m.fn.toFixed(3) + " similarity"}</dd>
+    </dl></div>
+    ${m.closest ? "" : `<div class="note">Another person in the database is closer to this face.</div>`}
+    <div class="acts"><button class="btn small" data-a="cmp">Compare faces</button><button class="btn small" data-a="frame">View full frame</button></div>
+    <div class="decide"><span>Your decision</span>
+      <button class="dbtn same" data-d="same">✓  This is the person</button>
+      <button class="dbtn not" data-d="not">✗  Not the person</button></div></div>`;
+  el.querySelector(".crops").onclick = () => openCompare(m, p);
+  el.querySelector("[data-a=cmp]").onclick = () => openCompare(m, p);
+  el.querySelector("[data-a=frame]").onclick = () => openFrame(m);
+  const btns = el.querySelectorAll(".dbtn");
+  const paint = () => btns.forEach(b => b.classList.toggle("on", b.dataset.d === m.decision));
+  btns.forEach(b => b.onclick = async () => {
+    const next = m.decision === b.dataset.d ? "" : b.dataset.d;
+    try { await post("/api/decision", { uid: m.uid, value: next }); }
+    catch (e) { return toast(e.message); }
+    m.decision = next; paint(); updateSummary();
+  });
+  paint();
+  return el;
+}
+
+function updateSummary() {
+  const s = $("#summary");
+  if (!results) { s.textContent = ""; s.className = ""; return; }
+  const confirmed = {}; let undecided = 0;
+  results.people.forEach(p => p.matches.forEach(m => {
+    if (m.decision === "same") (confirmed[p.name] = confirmed[p.name] || []).push(m);
+  }));
+  visibleMatches({ matches: results.people.flatMap(p => p.matches) }).forEach(m => { if (!m.decision) undecided++; });
+  const names = Object.keys(confirmed);
+  let txt = "No sighting confirmed yet.";
+  if (names.length) {
+    txt = "Confirmed: " + names.map(n => {
+      const last = confirmed[n].reduce((a, b) => (b.end_s > a.end_s ? b : a));
+      return `${n} ×${confirmed[n].length} (last seen ${last.end})`;
+    }).join("; ") + ".";
+  }
+  if (undecided) txt += `   ${undecided} candidate(s) still to review.`;
+  s.textContent = txt;
+  s.className = names.length ? "ok" : "";
+}
+
+/* ------------------------------------------------------------ pop-ups */
+const dlg = $("#dlg");
+dlg.addEventListener("click", e => { if (e.target === dlg) dlg.close(); });
+dlg.addEventListener("close", () => { $("#dlg-body").innerHTML = ""; dlg.onkeydown = null; });
+function openDlg(html) { $("#dlg-body").innerHTML = html; dlg.onkeydown = null; dlg.showModal(); return $("#dlg-body"); }
+
+function openViewer(name, n, urlFor) {
+  if (!n) return;
+  let i = 0;
+  const b = openDlg(`<h3>${esc(name)} – database photo</h3>
+    <img class="big" id="v-img" alt=""><p class="cap" id="v-cap"></p>
+    <div class="nav"><button class="btn" id="v-prev">‹  Previous</button><button class="btn" id="v-next">Next  ›</button>
+    <button class="btn ghost" id="v-close" style="margin-left:14px">Close</button></div>`);
+  const show = () => {
+    b.querySelector("#v-img").src = urlFor(i);
+    b.querySelector("#v-cap").textContent = `${name}  ·  photo ${i + 1} of ${n}`;
+  };
+  const step = d => { i = (i + d + n) % n; show(); };
+  b.querySelector("#v-prev").disabled = b.querySelector("#v-next").disabled = n < 2;
+  b.querySelector("#v-prev").onclick = () => step(-1);
+  b.querySelector("#v-next").onclick = () => step(1);
+  b.querySelector("#v-close").onclick = () => dlg.close();
+  dlg.onkeydown = e => { if (e.key === "ArrowLeft") step(-1); else if (e.key === "ArrowRight") step(1); };
+  show();
+}
+
+function openCompare(m, p) {
+  const v = results.search_id;
+  const photos = Array.from({ length: Math.min(3, p.n_photos) }, (_, i) =>
+    `<img src="/api/results/person/${p.idx}/photo?i=${i}&v=${v}" alt="Database photo">`).join("");
+  const crops = Array.from({ length: m.n_crops }, (_, i) =>
+    `<img src="/api/match/${q(m.uid)}/crop/${i}.jpg?v=${v}" alt="Face from the video">`).join("");
+  const b = openDlg(`<div class="hd" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <h3 style="margin:0">${esc(m.person)}  ·  Candidate #${m.rank}</h3>
+      <span class="pill" style="background:var(--${m.strong ? "ok" : "warn"});color:var(--pill-ink)">${m.strong ? "STRONG MATCH" : "POSSIBLE"}</span></div>
+    <div class="box"><div class="muted">Photo in the database</div><div class="strip">${photos || "Could not read the database photo."}</div></div>
+    <div class="box"><div class="muted">Found in the video  ·  ${m.start} – ${m.end}  ·  frames ${m.first_frame} – ${m.last_frame}</div>
+      <div class="strip">${crops}</div></div>
+    <p class="muted num" style="margin:12px 0">Confidence ${m.confidence}%      ArcFace distance ${m.arc.toFixed(3)}      FaceNet similarity ${m.fn === null ? "n/a" : m.fn.toFixed(3)}</p>
+    <div class="row"><button class="btn" id="c-frame">View full frame</button><button class="btn ghost" id="c-close">Close</button></div>`);
+  b.querySelector("#c-frame").onclick = () => openFrame(m);
+  b.querySelector("#c-close").onclick = () => dlg.close();
+}
+
+function openFrame(m) {
+  const b = openDlg(`<h3>${esc(m.person)}  ·  Candidate #${m.rank}  ·  frame ${m.mid_frame}</h3>
+    <p class="muted" id="f-wait">Reading the frame from the video...</p>
+    <img class="big" id="f-img" alt="Full video frame with the face outlined" hidden>
+    <div class="nav"><button class="btn ghost" id="f-close">Close</button></div>`);
+  const img = b.querySelector("#f-img");
+  img.onload = () => { b.querySelector("#f-wait").hidden = true; img.hidden = false; };
+  img.onerror = () => { b.querySelector("#f-wait").textContent = "Could not read this frame."; };
+  img.src = `/api/match/${q(m.uid)}/frame.jpg?v=${results.search_id}`;
+  b.querySelector("#f-close").onclick = () => dlg.close();
+}
+
+/* ------------------------------------------------------------ report */
+$("#save").onclick = async () => {
+  const btn = $("#save");
+  btn.disabled = true; setStatus("Saving the report...");
+  try {
+    const d = await post("/api/report");
+    latestReport = d;
+    $("#saved").innerHTML = `<span class="muted">Report saved.</span>
+      <a href="${esc(d.url)}" target="_blank" rel="noopener">Open report.html</a>
+      <a href="${esc(d.zip)}">Download .zip</a>`;
+    toast("Report saved to:\n" + d.folder);
+  } catch (e) { toast(e.message, 7000); }
+  setStatus("Done. Review the candidates.");
+  updateControls();
+};
+
+/* ------------------------------------------------------------ boot */
+(async function init() {
+  showPlaceholder();
+  try { state = await api("/api/state"); } catch (e) { return toast("Cannot reach the server."); }
+  renderDb(); renderVideo();
+  const j = state.job;
+  lastJob = j.state;
+  if (j.state === "running") { showLoading(j); startPolling(); }
+  else if (state.has_results) { await loadResults(true); }
+  updateControls();
+})();
+</script>
+</body>
+</html>

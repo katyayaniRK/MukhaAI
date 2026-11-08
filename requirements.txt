@@ -1,0 +1,7 @@
+flask>=3.0
+opencv-python
+numpy
+pillow
+insightface
+onnxruntime
+keras-facenet   # optional: enables the FaceNet half of the hybrid check
